@@ -1,0 +1,46 @@
+# .github/workflows/ci.yml
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+      - dev  
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements_dev.txt
+
+      - name: Run tests with pytest
+        run: |
+          pytest --disable-warnings
+        continue-on-error: false
+
+      - name: Check code formatting with black
+        run: |
+          black --check .
+        continue-on-error: false
+
+      - name: Run pylint
+        id: pylint
+        run: |
+          pylint **/*.py --fail-under=9.0
+        continue-on-error: false
+
+      - name: Notify failure if pylint score is too low
+        if: failure()
+        run: |
+          echo "Lint score is below threshold 9.0. Please fix the issues and try again."
