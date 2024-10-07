@@ -39,8 +39,3 @@ jobs:
         run: |
           pylint ./weather_report/**/*.py --fail-under=9.0
         continue-on-error: false
-
-      - name: Notify failure if pylint score is too low
-        if: failure()
-        run: |
-          echo "Lint score is below threshold 9.0. Please fix the issues and try again."
