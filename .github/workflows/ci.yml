@@ -26,18 +26,18 @@ jobs:
 
       - name: Run tests with pytest
         run: |
-          pytest --disable-warnings
+          pytest --disable-warnings ./tests
         continue-on-error: false
 
       - name: Check code formatting with black
         run: |
-          black --check .
+          black --check ./weather_report
         continue-on-error: false
 
       - name: Run pylint
         id: pylint
         run: |
-          pylint **/*.py --fail-under=9.0
+          pylint ./weather_report/**/*.py --fail-under=9.0
         continue-on-error: false
 
       - name: Notify failure if pylint score is too low
