@@ -46,19 +46,16 @@ def main():
         logging.error(err)
 
     # Send data
-    try:
-        response = requests.post(
-            os.getenv("POST_URL"),
-            json={
-                "time": read_time.isoformat(),
-                "temperature": data.temperature,
-                "pressure": data.pressure,
-                "humidity": data.humidity,
-            },
-        )
-        response.raise_for_status()
-    except requests.HTTPError as err:
-        logging.error(err)
-
-    # If success, log
-    logging.info(f"Data read and sent successfully")
+    response = requests.post(
+        os.getenv("POST_URL"),
+        json={
+            "time": read_time.isoformat(),
+            "temperature": data.temperature,
+            "pressure": data.pressure,
+            "humidity": data.humidity,
+        },
+    )
+    if response.status_code != 200:
+        logging.error(logging.error("Sensor read successfully but data post failed with error: %s", response.raise_for_status()))
+    else:
+        logging.info(f"Data read and sent successfully")
