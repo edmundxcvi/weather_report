@@ -23,7 +23,7 @@ logging.basicConfig(
 
 # Load sensor location from env
 load_dotenv()
-port = os.getenv("I2C_PORT")
+port = int(os.getenv("I2C_PORT"))
 address = os.getenv("I2C_ADDRESS")
 bus = smbus2.SMBus(port)
 
