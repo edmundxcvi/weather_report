@@ -1,1 +1,21 @@
-N.B the scheduled job assumes that a venv has been created in the root 
+To install:
+
+Create a venv in the root directory:
+
+`python -m venv .venv`
+
+If you create the venv in a different directory or call it something other than `.venv` then you will need to update `invoke_weather_report.sh` to activate the correct venv.
+
+Activate the venv now (altering the path if required):
+`source ./.venv/bin/activate`
+
+Install the package
+`pip install .`
+
+Ensure that both shell scripts are executable
+`chmod +x ./scripts/invoke_weather_report.sh && chmod +x ./scripts/schedule_weather_report.sh`
+
+Run the scheduler (edit the cron job to the desired frequency, default * * * * * is every minute)
+`./scripts/schedule_weather_report.sh`
+
+All set, the scheduler will run the python script every minute forever

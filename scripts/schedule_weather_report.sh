@@ -1,5 +1,5 @@
 #!/bin/bash
-ROOT_DIR="$(readlink -f $(dirname "$BASH_SOURCE[0]}"))"
+ROOT_DIR="$(readlink -f $(dirname $(dirname "$BASH_SOURCE[0]}")))"
 CRON_JOB="* * * * * $ROOT_DIR/invoke_weather_report.sh"
 
 # Check if cron job already exists
