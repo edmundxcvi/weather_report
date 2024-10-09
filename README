@@ -15,6 +15,10 @@ Install build dependencies (just wheel)
 Install the package
 `pip install .`
 
+Configure environment-specific variables by setting up a .env. The easiest way to do this is to copy the example.env and then edit as required
+`cp example.env .env`
+`nano .env`
+
 Ensure that both shell scripts are executable
 `chmod +x ./scripts/invoke_weather_report.sh && chmod +x ./scripts/schedule_weather_report.sh`
 
