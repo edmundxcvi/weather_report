@@ -13,7 +13,7 @@ setup(
     install_requires=requirements,  # Add any dependencies here if needed
     entry_points={
         "console_scripts": [
-            "weather_report=weather_report:main",  # Define the CLI command and entry point
+            "weather_report=weather_report.src:main",  # Define the CLI command and entry point
         ],
     },
 )
