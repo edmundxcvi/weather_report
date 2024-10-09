@@ -50,7 +50,7 @@ def main():
         response = requests.post(
             os.getenv("POST_URL"),
             json={
-                "time": read_time,
+                "time": read_time.isoformat(),
                 "temperature": data.temperature,
                 "pressure": data.pressure,
                 "humidity": data.humidity,
