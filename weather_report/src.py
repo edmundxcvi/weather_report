@@ -56,6 +56,11 @@ def main():
         },
     )
     if response.status_code != 200:
-        logging.error(logging.error("Sensor read successfully but data post failed with error: %s", response.raise_for_status()))
+        logging.error(
+            logging.error(
+                "Sensor read successfully but data post failed with error: %s",
+                response.reason,
+            )
+        )
     else:
         logging.info(f"Data read and sent successfully")

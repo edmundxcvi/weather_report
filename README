@@ -29,3 +29,20 @@ All set, the scheduler will run the python script every minute forever.
 
 To stop this, run (be careful, this will remove all cron jobs):
 `crontab -r`
+
+
+To monitor if the jobs are working successfully:
+
+Set the POST_URL to be local host (using port 5000 as an example)
+`POST_URL=http://localhost:5000`
+
+Start a python server on localhost
+`python -m htttp.server 5000`
+
+Install tcpdump
+`sudo apt install tcpdump`
+
+Monitor traffic on localhost at the spcified port
+`sudo tcpdump -i lo -A -s 0 'tcp port 5000'`
+
+Either wait for the scheduled cronjob or invoke `weather_report` manally.
