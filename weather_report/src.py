@@ -46,7 +46,7 @@ def main():
     # Send data
     try:
         response = requests.post(
-            os.getenv("URL"),
+            os.getenv("POST_URL"),
             json={
                 "time": read_time,
                 "temperature": data.temperature,
