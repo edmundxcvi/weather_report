@@ -21,4 +21,7 @@ Ensure that both shell scripts are executable
 Run the scheduler (edit the cron job to the desired frequency, default * * * * * is every minute)
 `./scripts/schedule_weather_report.sh`
 
-All set, the scheduler will run the python script every minute forever
+All set, the scheduler will run the python script every minute forever. 
+
+To stop this, run (be careful, this will remove all cron jobs):
+`crontab -r`
