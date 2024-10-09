@@ -7,7 +7,7 @@ import os
 import bme280
 import smbus2
 from dotenv import load_dotenv
-import datetime
+from datetime import datetime, timezone
 import requests
 import logging
 from pathlib import Path
@@ -37,7 +37,7 @@ def main():
     """
 
     # Read time
-    read_time = datetime.utcnow()
+    read_time = datetime.now(timezone.utc)
 
     # Read sensor
     try:
