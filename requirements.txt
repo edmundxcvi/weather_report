@@ -1,0 +1,4 @@
+smbus2==0.4.3
+RPi.bme280==0.2.4
+python_dotenv==1.0.1
+requests==2.32.3
