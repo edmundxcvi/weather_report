@@ -9,6 +9,9 @@ If you create the venv in a different directory or call it something other than 
 Activate the venv now (altering the path if required):
 `source ./.venv/bin/activate`
 
+Install build dependencies (just wheel)
+`pip install wheel==0.44.0`
+
 Install the package
 `pip install .`
 
