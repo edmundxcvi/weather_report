@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 # Read requirements from requirements.txt
 # Sorry abt the strict requirements (not)
@@ -9,7 +9,7 @@ with open('requirements.txt', 'r') as file:
 setup(
     name="weather_report",
     version="0.0.0",
-    py_modules=["weather_report"],  # Your main script file without the .py extension
+    packages=find_packages(),  
     install_requires=requirements,  # Add any dependencies here if needed
     entry_points={
         "console_scripts": [
