@@ -2,15 +2,15 @@
 Read sensor data from BME280 and send it over local network
 """
 
+import logging
 import os
+from datetime import datetime, timezone
+from pathlib import Path
 
 import bme280
+import requests
 import smbus2
 from dotenv import load_dotenv
-from datetime import datetime, timezone
-import requests
-import logging
-from pathlib import Path
 
 # Set up logging
 log_file = Path.home() / "sensor_logs.log"
@@ -30,6 +30,9 @@ bus = smbus2.SMBus(port)
 # Load calibration parameters from sensor
 sensor_calibration = bme280.load_calibration_params(bus, address)
 
+# Set post timeout
+POST_TIMEOUT = 5  # seconds
+
 
 def main():
     """
@@ -43,7 +46,7 @@ def main():
     try:
         data = bme280.sample(bus, address, sensor_calibration)
     except Exception as err:
-        logging.error(err)
+        logging.error("Error reading sensor: %s", err)
 
     # Send data
     response = requests.post(
@@ -54,6 +57,7 @@ def main():
             "pressure": data.pressure,
             "humidity": data.humidity,
         },
+        timeout=POST_TIMEOUT,
     )
     if response.status_code != 200:
         logging.error(
@@ -63,4 +67,4 @@ def main():
             )
         )
     else:
-        logging.info(f"Data read and sent successfully")
+        logging.info("Data read and sent successfully")
