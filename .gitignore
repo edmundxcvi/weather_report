@@ -1,2 +1,4 @@
 build/*
 weather_report.egg-info/*  
+venv/*
+.venv/*

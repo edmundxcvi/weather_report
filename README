@@ -1,0 +1,48 @@
+To install:
+
+Create a venv in the root directory:
+
+`python -m venv .venv`
+
+If you create the venv in a different directory or call it something other than `.venv` then you will need to update `invoke_weather_report.sh` to activate the correct venv.
+
+Activate the venv now (altering the path if required):
+`source ./.venv/bin/activate`
+
+Install build dependencies (just wheel)
+`pip install wheel==0.44.0`
+
+Install the package
+`pip install .`
+
+Configure environment-specific variables by setting up a .env. The easiest way to do this is to copy the example.env and then edit as required
+`cp example.env .env`
+`nano .env`
+
+Ensure that both shell scripts are executable
+`chmod +x ./scripts/invoke_weather_report.sh && chmod +x ./scripts/schedule_weather_report.sh`
+
+Run the scheduler (edit the cron job to the desired frequency, default * * * * * is every minute)
+`./scripts/schedule_weather_report.sh`
+
+All set, the scheduler will run the python script every minute forever. 
+
+To stop this, run (be careful, this will remove all cron jobs):
+`crontab -r`
+
+
+To monitor if the jobs are working successfully:
+
+Set the POST_URL to be local host (using port 5000 as an example)
+`POST_URL=http://localhost:5000`
+
+Start a python server on localhost
+`python -m htttp.server 5000`
+
+Install tcpdump
+`sudo apt install tcpdump`
+
+Monitor traffic on localhost at the spcified port
+`sudo tcpdump -i lo -A -s 0 'tcp port 5000'`
+
+Either wait for the scheduled cronjob or invoke `weather_report` manally.
