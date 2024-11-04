@@ -59,8 +59,7 @@ def main():
         },
         timeout=POST_TIMEOUT,
     )
-    if response.status_code != 200:
-        print(response.status_code)
+    if response.status_code != 201:
         logging.error(
             logging.error(
                 "Sensor read successfully but data post failed with error: %s",
