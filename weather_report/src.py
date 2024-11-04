@@ -49,14 +49,6 @@ def main():
         logging.error("Error reading sensor: %s", err)
 
     # Send data
-    print(os.getenv("POST_URL"))
-    print({
-            "time": read_time.isoformat(),
-            "temperature": data.temperature,
-            "pressure": data.pressure,
-            "humidity": data.humidity,
-        })
-    print(POST_TIMEOUT)
     response = requests.post(
         os.getenv("POST_URL"),
         json={
