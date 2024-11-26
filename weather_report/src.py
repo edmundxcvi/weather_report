@@ -47,20 +47,29 @@ def main():
         data = bme280.sample(bus, address, sensor_calibration)
     except Exception as err:
         logging.error("Error reading sensor: %s", err)
+    else:
+        logging.info("Sensor read successfully")
 
     # Send data
-    response = requests.post(
-        os.getenv("POST_URL"),
-        json={
-            "time": read_time.isoformat(),
-            "temperature": data.temperature,
-            "pressure": data.pressure,
-            "humidity": data.humidity,
-        },
-        headers={'Authorization': os.getenv('API_KEY')},
-        timeout=POST_TIMEOUT,
-        verify=os.getenv('SSL_CERT_PATH')
-    )
+    try:
+        response = requests.post(
+            os.getenv("POST_URL"),
+            json={
+                "time": read_time.isoformat(),
+                "temperature": data.temperature,
+                "pressure": data.pressure,
+                "humidity": data.humidity,
+            },
+            headers={"Authorization": os.getenv("API_KEY")},
+            timeout=POST_TIMEOUT,
+            verify=os.getenv("SSL_CERT_PATH"),
+        )
+        response.raise_for_status()
+    except requests.HTTPError as e:
+        logging.error("Failed to send post request: %s", e)
+    else:
+        logging.info("Post request sent")
+
     if response.status_code != 201:
         logging.error(
             logging.error(
