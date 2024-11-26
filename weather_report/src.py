@@ -57,6 +57,7 @@ def main():
             "pressure": data.pressure,
             "humidity": data.humidity,
         },
+        headers={'Authorization': os.getenv('API_KEY')},
         timeout=POST_TIMEOUT,
     )
     if response.status_code != 201:
