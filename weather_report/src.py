@@ -59,7 +59,7 @@ def main():
         },
         headers={'Authorization': os.getenv('API_KEY')},
         timeout=POST_TIMEOUT,
-        verify=os.getenv('SSL_CERT_ABSOLUTE_PATH')
+        verify=os.getenv('SSL_CERT_PATH')
     )
     if response.status_code != 201:
         logging.error(
