@@ -46,7 +46,7 @@ def main():
     except Exception as err:
         logger.error("Error reading sensor: %s", err)
     else:
-        logger.info("Sensor read successfully")
+        logger.debug("Sensor read successfully")
 
     # Send data
     try:
@@ -66,7 +66,7 @@ def main():
     except requests.HTTPError as e:
         logger.error("Failed to send post request: %s", e)
     else:
-        logger.info("Post request sent")
+        logger.debug("Post request sent")
 
     if response.status_code != 201:
         logger.error(
