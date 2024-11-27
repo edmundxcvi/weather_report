@@ -13,12 +13,14 @@ import smbus2
 from dotenv import load_dotenv
 from loguru import logger
 
+load_dotenv()
+
+
 # Set up logging
 logger.remove()
 logger.add(os.getenv('LOG_FILE_PATH'), level='INFO', retention='2 days')
 
 # Load sensor location from env
-load_dotenv()
 port = int(os.getenv("I2C_PORT"))
 address = int(os.getenv("I2C_ADDRESS"), 16)
 bus = smbus2.SMBus(port)
