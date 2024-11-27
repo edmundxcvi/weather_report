@@ -11,15 +11,11 @@ import bme280
 import requests
 import smbus2
 from dotenv import load_dotenv
+from loguru import logger
 
 # Set up logging
-log_file = Path.home() / "sensor_logs.log"
-logging.basicConfig(
-    filename=log_file,
-    level=logging.INFO,
-    format="%(asctime)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
+logger.remove()
+logger.add(os.getenv('LOG_FILE_PATH'), level='INFO', retention='2 days')
 
 # Load sensor location from env
 load_dotenv()
@@ -46,9 +42,9 @@ def main():
     try:
         data = bme280.sample(bus, address, sensor_calibration)
     except Exception as err:
-        logging.error("Error reading sensor: %s", err)
+        logger.error("Error reading sensor: %s", err)
     else:
-        logging.info("Sensor read successfully")
+        logger.info("Sensor read successfully")
 
     # Send data
     try:
@@ -66,16 +62,14 @@ def main():
         )
         response.raise_for_status()
     except requests.HTTPError as e:
-        logging.error("Failed to send post request: %s", e)
+        logger.error("Failed to send post request: %s", e)
     else:
-        logging.info("Post request sent")
+        logger.info("Post request sent")
 
     if response.status_code != 201:
-        logging.error(
-            logging.error(
-                "Sensor read successfully but data post failed with error: %s",
-                response.reason,
-            )
+        logger.error(
+            "Sensor read successfully but data post failed with error: %s",
+            response.reason,
         )
     else:
-        logging.info("Data read and sent successfully")
+        logger.info("Data read and sent successfully")
