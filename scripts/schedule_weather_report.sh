@@ -14,9 +14,13 @@ if ! [[ "$INTERVAL" =~ ^[0-9]+$ ]] || [ "$INTERVAL" -le 0 ]; then
     exit 1
 fi
 
+
 # Create job
 ROOT_DIR="$(readlink -f $(dirname $(dirname "$BASH_SOURCE[0]}")))"
 CRON_JOB="*/$INTERVAL * * * * $ROOT_DIR/scripts/invoke_weather_report.sh"
+
+# Ensure that job is executable
+chmod +x $ROOT_DIR/scripts/invoke_weather_report.sh
 
 # Copy existing cronjobs to variable (excluding errors, which are sent to /dev/null)
 # and use grep to filter out any lines which match the job text
