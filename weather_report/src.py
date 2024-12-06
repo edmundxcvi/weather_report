@@ -37,7 +37,7 @@ class SensorData:
 
     def to_dict(self):
         return {
-            "observation_time": self.observation_time,
+            "observation_time": self.observation_time.isoformat(),
             "temperature": self.temperature,
             "pressure": self.pressure,
             "humidity": self.humidity,
