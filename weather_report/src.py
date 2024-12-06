@@ -18,6 +18,12 @@ from loguru import logger
 
 load_dotenv()
 
+def load_env_var(var_name: str) -> str:
+    try: 
+        return os.environ[var_name]   
+    except KeyError:
+        logger.error('Could not load required environment variable {var_name}, check .env file')
+        exit()
 
 # Set up logging
 logger.remove()
@@ -25,12 +31,6 @@ logger.add(load_env_var("LOG_FILE_PATH"), level="INFO", retention="2 days")
 logger.add(sys.stdout, level="DEBUG")
 
 
-def load_env_var(var_name: str) -> str:
-    try: 
-        return os.environ[var_name]   
-    except KeyError:
-        logger.error('Could not load required environment variable {var_name}, check .env file')
-        exit()
 
 @dataclass
 class SensorData:
