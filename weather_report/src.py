@@ -18,18 +18,21 @@ from loguru import logger
 
 load_dotenv()
 
+
 def load_env_var(var_name: str) -> str:
-    try: 
-        return os.environ[var_name]   
+    try:
+        return os.environ[var_name]
     except KeyError:
-        logger.error('Could not load required environment variable {var_name}, check .env file')
+        logger.error(
+            "Could not load required environment variable {var_name}, check .env file"
+        )
         exit()
+
 
 # Set up logging
 logger.remove()
 logger.add(load_env_var("LOG_FILE_PATH"), level="INFO", retention="2 days")
 logger.add(sys.stdout, level="DEBUG")
-
 
 
 @dataclass
@@ -121,13 +124,12 @@ def read_sensor(port: Union[int, str], address: Union[int, str]) -> SensorData:
     )
 
 
-def save_data_to_buffer(sensor_data: SensorData, buffer_path: Path):
+def save_data_to_buffer(sensor_data: SensorData, buffer_dir_path: Path):
 
     obs_time_str = sensor_data.observation_time.strftime("%Y%m%d%H%M%S")
-    json.dump(
-        sensor_data.to_dict(),
-        buffer_path / f"read_{obs_time_str}.json",
-    )
+    buffer_file_path = buffer_dir_path / f"read_{obs_time_str}.json"
+    with open(buffer_file_path) as buffer_file:
+        json.dump(sensor_data.to_dict(), buffer_file)
 
 
 def post_data(
@@ -196,7 +198,7 @@ def read_and_post():
         logger.debug("Sensor read successfully")
 
     # Read post config from env
-    post_config = PostConfig.from_env(verify = load_env_var('SSL_CERT_PATH'))
+    post_config = PostConfig.from_env(verify=load_env_var("SSL_CERT_PATH"))
 
     # Send post request
     response = post_data(sensor_data, post_config)
