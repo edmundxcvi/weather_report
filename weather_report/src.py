@@ -37,7 +37,7 @@ def start_logs(logfile_name: str) -> Logger:
 
     # Info goes to file
     log_file_path = Path(load_env_var("LOG_FILE_PATH")) / f"{logfile_name}.log"
-    logger.add(log_file_path, level="INFO")
+    logger.add(log_file_path, level="INFO", mode='a')
 
     # Also log at debug to console
     logger.add(sys.stdout, level="DEBUG")
