@@ -173,7 +173,7 @@ def post_data(
                 )
             else:
                 logger.warning(
-                    f"Post request failed but data was saved to buffer successfuly"
+                    f"Post request failed but data was saved to buffer successfuly. Request error was: {request_err}"
                 )
         else:
             logger.error(
