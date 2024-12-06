@@ -179,7 +179,7 @@ def read_and_post():
     try:
         sensor_data = read_sensor(port, address)
     except Exception as err:
-        logger.error("Error reading sensor: %s", err)
+        logger.error(f"Error reading sensor: {err}")
         exit()
     else:
         logger.debug("Sensor read successfully")
