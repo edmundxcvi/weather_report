@@ -158,6 +158,7 @@ def post_data(
             **post_config.to_dict(),
             json=sensor_data.to_dict(),
         )
+        logger.debug(f'Request URL {response.request.url}')
         response.raise_for_status()
 
     # If post fails
