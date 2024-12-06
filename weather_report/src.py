@@ -21,9 +21,16 @@ load_dotenv()
 
 # Set up logging
 logger.remove()
-logger.add(os.getenv("LOG_FILE_PATH"), level="INFO", retention="2 days")
+logger.add(load_env_var("LOG_FILE_PATH"), level="INFO", retention="2 days")
 logger.add(sys.stdout, level="DEBUG")
 
+
+def load_env_var(var_name: str) -> str:
+    try: 
+        return os.environ[var_name]   
+    except KeyError:
+        logger.error('Could not load required environment variable {var_name}, check .env file')
+        exit()
 
 @dataclass
 class SensorData:
@@ -66,10 +73,11 @@ class PostConfig:
 
     @classmethod
     def from_env(cls, verify=True):
+
         return cls(
-            post_url=os.getenv("POST_URL"),
-            api_key=os.getenv("API_KEY"),
-            timeout=int(os.getenv("POST_TIMEOUT_SECONDS")),
+            post_url=load_env_var("POST_URL"),
+            api_key=load_env_var("API_KEY"),
+            timeout=int(load_env_var("POST_TIMEOUT_SECONDS")),
             verify=verify,
         )
 
@@ -150,7 +158,7 @@ def post_data(
         # Attempt to save in file buffer if requested
         if buffer:
             try:
-                save_data_to_buffer(sensor_data, Path(os.getenv("POST_BUFFER_PATH")))
+                save_data_to_buffer(sensor_data, Path(load_env_var("POST_BUFFER_PATH")))
             except OSError as os_err:
                 logger.error(
                     f"Post request failed and data could not be saved due to the following exception: {os_err}"
@@ -175,8 +183,8 @@ def post_data(
 def read_and_post():
 
     # Load sensor location from env
-    port = int(os.getenv("I2C_PORT"))
-    address = int(os.getenv("I2C_ADDRESS"), 16)
+    port = int(load_env_var("I2C_PORT"))
+    address = int(load_env_var("I2C_ADDRESS"), 16)
 
     # Read sensor
     try:
@@ -188,7 +196,7 @@ def read_and_post():
         logger.debug("Sensor read successfully")
 
     # Read post config from env
-    post_config = PostConfig.from_env(verify = os.getenv('SSL_CERT_PATH'))
+    post_config = PostConfig.from_env(verify = load_env_var('SSL_CERT_PATH'))
 
     # Send post request
     response = post_data(sensor_data, post_config)
