@@ -14,7 +14,7 @@ import requests
 import smbus2
 from typing import Union
 from dotenv import load_dotenv
-from loguru import logger
+from loguru import logger,Logger
 
 load_dotenv()
 
@@ -29,10 +29,18 @@ def load_env_var(var_name: str) -> str:
         exit()
 
 
-# Set up logging
-logger.remove()
-logger.add(load_env_var("LOG_FILE_PATH"), level="INFO", retention="2 days")
-logger.add(sys.stdout, level="DEBUG")
+def start_logs(logfile_name: str) -> Logger:
+
+    # Clear any existing logs
+    logger.remove()
+
+    # Info goes to file
+    log_file_path = Path(load_env_var("LOG_FILE_PATH")) / f'{logfile_name}'.log
+    logger.add(log_file_path, level="INFO")
+    
+    # Also log at debug to console
+    logger.add(sys.stdout, level="DEBUG")
+    return logger
 
 
 @dataclass
@@ -97,6 +105,7 @@ def read_sensor(port: Union[int, str], address: Union[int, str]) -> SensorData:
     Returns:
         SensorData
     """
+
     # Convert inputs to integers (if not already)
     if not isinstance(port, int):
         port = int(port)
@@ -190,6 +199,9 @@ def post_data(
 
 def read_and_post():
 
+    # Start logging
+    start_logs("sensor_reads")
+
     # Load sensor location from env
     port = int(load_env_var("I2C_PORT"))
     address = int(load_env_var("I2C_ADDRESS"), 16)
@@ -216,3 +228,17 @@ def read_and_post():
         )
     else:
         logger.info("Data read and sent successfully")
+
+
+def flush_buffer():
+
+    # Check for unsent data files
+    buffer_file_names = Path(load_env_var('POST_BUFFER_PATH')).glob('*.json')
+
+    # If list is empty then report
+
+
+    # Load sensor location from env
+    port = int(load_env_var("I2C_PORT"))
+    address = int(load_env_var("I2C_ADDRESS"), 16)
+
