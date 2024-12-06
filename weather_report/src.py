@@ -12,7 +12,7 @@ from dataclasses import dataclass
 import bme280
 import requests
 import smbus2
-from typing import Union
+from typing import Union, Mapping, Any
 from dotenv import load_dotenv
 from loguru import logger,Logger
 
@@ -62,6 +62,14 @@ class SensorData:
             "humidity": self.humidity,
         }
 
+    @classmethod
+    def from_json(cls, data_dict: Mapping[str, Any]):
+        return cls(
+            observation_time=datetime.fromisoformat(data_dict['observation_time']),
+            temperature=data_dict['temperature'],
+            pressure=data_dict['pressure'],
+            humidity=data_dict['humidity'],
+        )
 
 @dataclass
 class PostConfig:
@@ -148,7 +156,7 @@ def save_data_to_buffer(sensor_data: SensorData, buffer_dir_path: Path):
 
 
 def post_data(
-    sensor_data: SensorData, post_config: PostConfig, buffer=True
+    sensor_data: SensorData, post_config: PostConfig, buffer=True, on_error='exit'
 ) -> requests.Response:
     """Sends data to server
 
@@ -188,7 +196,9 @@ def post_data(
             logger.error(
                 f"Post request failed due to the following exception: {request_err}"
             )
-        exit()
+        # Leave if requested
+        if on_error == 'exit':
+            exit()
 
     # If post request succeeds then all good!
     else:
@@ -232,13 +242,54 @@ def read_and_post():
 
 def flush_buffer():
 
+    # Start logging
+    start_logs("buffer_flushes")
+
     # Check for unsent data files
     buffer_file_names = Path(load_env_var('POST_BUFFER_PATH')).glob('*.json')
 
-    # If list is empty then report
+    # If list is empty then report and leave
+    if len(buffer_file_names) == 0:
+        logger.info('No files found in buffer')
+        exit()
+    logger.info(f'{len(buffer_file_names)} files found in buffer')
+
+    # Read post config from env
+    post_config = PostConfig.from_env(verify=load_env_var("SSL_CERT_PATH"))
+
+    # Loop through files
+    n_attempts = 0
+    attempt_limit = int(load_env_var('BUFFER_POST_ATTEMPT_LIMIT'))
+    for file_name in buffer_file_names:
+
+        # Check that attempt limit has not been exceeded
+        if n_attempts > attempt_limit:
+            logger.error(f'Post request failed {n_attempts} times (max {attempt_limit}), exiting')
+            exit()
+
+        # Load data from file
+        try:
+            with file_name.open() as buffer_file:
+                sensor_data = json.load(buffer_file)
+                sensor_data = SensorData.from_json(sensor_data)
+        except (OSError, KeyError) as err:
+            logger.error(f"Could not read data file due to the following exception: {err}")
+
+        # Send post request
+        response = post_data(sensor_data, post_config, buffer=False, on_error='continue')
+
+        # If response is not as expected move on to next file (but don't delete)
+        if response.status_code != 201:
+            logger.warning(
+                f"Buffer flush received unexpected status code {response.status_code}: {response.reason}"
+            )
+            n_attempts += 1
+            continue
+
+        # Otherwise delete buffer file to prevent duplication
+        logger.debug(f'File {file_name.name} posted successfully, removing from buffer')
+        file_name.unlink()
+        logger.info(f'File {file_name.name} posted successfully and removed from buffer')
 
 
-    # Load sensor location from env
-    port = int(load_env_var("I2C_PORT"))
-    address = int(load_env_var("I2C_ADDRESS"), 16)
 
