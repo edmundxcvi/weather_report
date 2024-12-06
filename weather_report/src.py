@@ -22,7 +22,8 @@ load_dotenv()
 # Set up logging
 logger.remove()
 logger.add(os.getenv("LOG_FILE_PATH"), level="INFO", retention="2 days")
-logger.add(sys.stdout, level='DEBUG')
+logger.add(sys.stdout, level="DEBUG")
+
 
 @dataclass
 class SensorData:
@@ -186,7 +187,7 @@ def read_and_post():
         logger.debug("Sensor read successfully")
 
     # Read post config from env
-    post_config = PostConfig.from_env()
+    post_config = PostConfig.from_env(verify = os.getenv('SSL_CERT_PATH'))
 
     # Send post request
     response = post_data(sensor_data, post_config)
@@ -198,4 +199,3 @@ def read_and_post():
         )
     else:
         logger.info("Data read and sent successfully")
-
