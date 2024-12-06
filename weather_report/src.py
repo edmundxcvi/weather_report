@@ -145,7 +145,8 @@ def post_data(
         response.raise_for_status()
 
     # If post fails
-    except requests.HTTPError as http_err:
+    # Request exception covers error return codes, but also covers other connection issues like SSL and Connection Errors
+    except requests.RequestException as request_err:
         # Attempt to save in file buffer if requested
         if buffer:
             try:
@@ -160,7 +161,7 @@ def post_data(
                 )
         else:
             logger.error(
-                f"Post request failed due to the following exception: {http_err}"
+                f"Post request failed due to the following exception: {request_err}"
             )
         exit()
 
