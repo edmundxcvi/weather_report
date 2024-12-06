@@ -14,7 +14,8 @@ import requests
 import smbus2
 from typing import Union, Mapping, Any
 from dotenv import load_dotenv
-from loguru import logger,Logger
+from loguru import logger
+from loguru._logger import Logger
 
 load_dotenv()
 
