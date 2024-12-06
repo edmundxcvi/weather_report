@@ -108,6 +108,7 @@ def read_sensor(port: Union[int, str], address: Union[int, str]) -> SensorData:
         observation_time=read_time,
         temperature=sensor_data.temperature,
         pressure=sensor_data.pressure,
+        humidity=sensor_data.humidity,
     )
 
 
