@@ -126,8 +126,14 @@ def read_sensor(port: Union[int, str], address: Union[int, str]) -> SensorData:
 
 def save_data_to_buffer(sensor_data: SensorData, buffer_dir_path: Path):
 
+    # Ensure that directory exists
+    buffer_dir_path.mkdir(exist_ok=True)
+
+    # Create buffer file name
     obs_time_str = sensor_data.observation_time.strftime("%Y%m%d%H%M%S")
     buffer_file_path = buffer_dir_path / f"read_{obs_time_str}.json"
+
+    # Write buffer file
     with buffer_file_path.open("w") as buffer_file:
         json.dump(sensor_data.to_dict(), buffer_file)
 
