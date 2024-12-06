@@ -128,7 +128,7 @@ def save_data_to_buffer(sensor_data: SensorData, buffer_dir_path: Path):
 
     obs_time_str = sensor_data.observation_time.strftime("%Y%m%d%H%M%S")
     buffer_file_path = buffer_dir_path / f"read_{obs_time_str}.json"
-    with open(buffer_file_path) as buffer_file:
+    with buffer_file_path.open("w") as buffer_file:
         json.dump(sensor_data.to_dict(), buffer_file)
 
 
