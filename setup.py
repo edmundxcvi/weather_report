@@ -10,10 +10,10 @@ setup(
     name="weather_report",
     version="0.0.0",
     packages=find_packages(),
-    install_requires=requirements,  # Add any dependencies here if needed
+    install_requires=requirements,  
     entry_points={
         "console_scripts": [
-            "weather_report=weather_report.src:main",  # Define the CLI command and entry point
+            "weather_report=weather_report.src:read_and_post",  
         ],
     },
 )

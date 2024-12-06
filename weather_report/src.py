@@ -6,10 +6,12 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 import json
+from dataclasses import dataclass
 
 import bme280
 import requests
 import smbus2
+from typing import Union
 from dotenv import load_dotenv
 from loguru import logger
 
@@ -18,73 +20,178 @@ load_dotenv()
 
 # Set up logging
 logger.remove()
-logger.add(os.getenv('LOG_FILE_PATH'), level='INFO', retention='2 days')
+logger.add(os.getenv("LOG_FILE_PATH"), level="INFO", retention="2 days")
 
-# Load sensor location from env
-port = int(os.getenv("I2C_PORT"))
-address = int(os.getenv("I2C_ADDRESS"), 16)
-bus = smbus2.SMBus(port)
 
-# Load calibration parameters from sensor
-sensor_calibration = bme280.load_calibration_params(bus, address)
-
-# Set post timeout
-POST_TIMEOUT = 5  # seconds
-
-# Prepare for failure
-post_buffer_path = Path(os.getenv('POST_BUFFER_PATH'))
-
-def main():
+@dataclass
+class SensorData:
     """
-    Read BME and send data to a URL
+    Data class for sensor read
     """
 
-    # Read time
+    observation_time: datetime
+    temperature: float
+    pressure: float
+    humidity: float
+
+    def to_dict(self):
+        return {
+            "observation_time": self.observation_time,
+            "temperature": self.temperature,
+            "pressure": self.pressure,
+            "humidity": self.humidity,
+        }
+
+
+@dataclass
+class PostConfig:
+    """
+    Data class for requests kwargs
+    """
+
+    post_url: str
+    api_key: str
+    timeout: int
+    verify: bool
+
+    def to_dict(self):
+        return {
+            "url": self.post_url,
+            "headers": {"Authorization": self.api_key},
+            "timeout": self.timeout,
+            "verify": self.verify,
+        }
+
+    @classmethod
+    def from_env(cls, verify=True):
+        return cls(
+            post_url=os.getenv("POST_URL"),
+            api_key=os.getenv("API_KEY"),
+            timeout=os.getenv("POST_TIMEOUT_SECONDS"),
+            verify=verify,
+        )
+
+
+def read_sensor(port: Union[int, str], address: Union[int, str]) -> SensorData:
+    """Gets data from sensor
+
+    Can pass the address in as a string representation of address as a base
+    sixteen integer, which will be converted to int in function
+
+    Args:
+        port (Union[int, str]) address (Union[int, str])
+
+    Returns:
+        SensorData
+    """
+    # Convert inputs to integers (if not already)
+    if not isinstance(port, int):
+        port = int(port)
+    if not isinstance(address, int):
+        address = int(address, 16)
+
+    # Get bus for port
+    bus = smbus2.SMBus(port)
+
+    # Load calibration parameters from sensor
+    sensor_calibration = bme280.load_calibration_params(bus, address)
+
+    # Get time ahead of read
     read_time = datetime.now(timezone.utc)
 
     # Read sensor
+    sensor_data = bme280.sample(bus, address, sensor_calibration)
+
+    # Convert to a sensible object
+    return SensorData(
+        observation_time=read_time,
+        temperature=sensor_data.temperature,
+        pressure=sensor_data.pressure,
+    )
+
+
+def save_data_to_buffer(sensor_data: SensorData, buffer_path: Path):
+
+    obs_time_str = sensor_data.observation_time.strftime("%Y%m%d%H%M%S")
+    json.dump(
+        sensor_data.to_dict(),
+        buffer_path / f"read_{obs_time_str}.json",
+    )
+
+
+def post_data(
+    sensor_data: SensorData, post_config: PostConfig, buffer=True
+) -> requests.Response:
+    """Sends data to server
+
+    Args:
+        sensor_data (SensorData)
+        post_config (PostConfig)
+        buffer (bool, optional): Defaults to True.
+
+    Returns:
+        requests.Response
+    """
+
+    # Try post
     try:
-        data = bme280.sample(bus, address, sensor_calibration)
+        response = requests.post(
+            **post_config.to_dict(),
+            json=sensor_data.to_dict(),
+        )
+        response.raise_for_status()
+
+    # If post fails
+    except requests.HTTPError as http_err:
+        # Attempt to save in file buffer if requested
+        if buffer:
+            try:
+                save_data_to_buffer(sensor_data, Path(os.getenv("POST_BUFFER_PATH")))
+            except OSError as os_err:
+                logger.error(
+                    f"Post request failed and data could not be saved due to the following exception: {os_err}"
+                )
+            else:
+                logger.warning(
+                    f"Post request failed but data was saved to buffer successfuly"
+                )
+        else:
+            logger.error(
+                f"Post request failed due to the following exception: {http_err}"
+            )
+
+    # If post request succeeds then all good!
+    else:
+        logger.debug("Post request sent")
+
+    return response
+
+
+def read_and_post():
+
+    # Load sensor location from env
+    port = int(os.getenv("I2C_PORT"))
+    address = int(os.getenv("I2C_ADDRESS"), 16)
+
+    # Read sensor
+    try:
+        sensor_data = read_sensor(port, address)
     except Exception as err:
         logger.error("Error reading sensor: %s", err)
     else:
         logger.debug("Sensor read successfully")
 
-    # Collate into dict
-    data_dict = {
-                "time": read_time.isoformat(),
-                "temperature": data.temperature,
-                "pressure": data.pressure,
-                "humidity": data.humidity,
-            }
+    # Read post config from env
+    post_config = PostConfig.from_env()
 
-    # Send data
-    try:
-        response = requests.post(
-            os.getenv("POST_URL"),
-            json=data_dict,
-            headers={"Authorization": os.getenv("API_KEY")},
-            timeout=POST_TIMEOUT,
-            verify=os.getenv("SSL_CERT_PATH"),
-        )
-        response.raise_for_status()
-    # If data coun't be sent try to save it
-    # (This would be triggered by e.g. server unavailable)
-    except requests.HTTPError as e:
-        logger.error("Failed to send post request: %s", e)
-        try:
-            json.dump(data_dict, post_buffer_path / f"read_{read_time.strftime('%Y%m%d%H%M%S')}.json")
-        except OSError:
-            logger.error(f"Post request could not be saved: {e}")
-        else:
-            logger.warning(f"Post request saved to buffer.")
-    else:
-        logger.debug("Post request sent")
+    # Send post request
+    response = post_data(sensor_data, post_config)
 
-    # If unexpected error code returned but post request successful then warn
+    # Check for unexpected status
     if response.status_code != 201:
         logger.warning(
             f"Sensor read received unexpected status code {response.status_code}: {response.reason}"
         )
     else:
         logger.info("Data read and sent successfully")
+
