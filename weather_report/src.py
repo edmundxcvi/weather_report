@@ -3,6 +3,7 @@ Read sensor data from BME280 and send it over local network
 """
 
 import os
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 import json
@@ -21,7 +22,7 @@ load_dotenv()
 # Set up logging
 logger.remove()
 logger.add(os.getenv("LOG_FILE_PATH"), level="INFO", retention="2 days")
-
+logger.add(sys.stdout, level='DEBUG')
 
 @dataclass
 class SensorData:
