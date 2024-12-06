@@ -160,6 +160,7 @@ def post_data(
             logger.error(
                 f"Post request failed due to the following exception: {http_err}"
             )
+        exit()
 
     # If post request succeeds then all good!
     else:
@@ -179,6 +180,7 @@ def read_and_post():
         sensor_data = read_sensor(port, address)
     except Exception as err:
         logger.error("Error reading sensor: %s", err)
+        exit()
     else:
         logger.debug("Sensor read successfully")
 
