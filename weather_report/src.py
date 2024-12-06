@@ -69,7 +69,7 @@ class PostConfig:
         return cls(
             post_url=os.getenv("POST_URL"),
             api_key=os.getenv("API_KEY"),
-            timeout=os.getenv("POST_TIMEOUT_SECONDS"),
+            timeout=int(os.getenv("POST_TIMEOUT_SECONDS")),
             verify=verify,
         )
 
