@@ -254,10 +254,9 @@ def flush_buffer():
     start_logs("buffer_flushes")
 
     # Check for unsent data files
-    buffer_file_names = (
-        Path(load_env_var("OUTPUT_DATA_DIR")) / "observation_buffer"
-    ).glob("*.json")
-
+    buffer_dir =  Path(load_env_var("OUTPUT_DATA_DIR")) / "observation_buffer"
+    buffer_file_names = [file for file in buffer_dir.iterdir() if file.is_file()]
+    
     # If list is empty then report and leave
     if len(buffer_file_names) == 0:
         logger.info("No files found in buffer")
