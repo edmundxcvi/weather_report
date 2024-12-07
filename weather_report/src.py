@@ -299,7 +299,11 @@ def flush_buffer():
         )
 
         # If response is not as expected move on to next file (but don't delete)
-        if response.status_code != 201:
+        if response is None:
+            logger.warning("Buffer flush failed during post request (did not receive response)")
+            n_attempts += 1
+            continue
+        elif response.status_code != 201:
             logger.warning(
                 f"Buffer flush received unexpected status code {response.status_code}: {response.reason}"
             )
