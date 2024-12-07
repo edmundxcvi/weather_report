@@ -14,6 +14,7 @@ setup(
     entry_points={
         "console_scripts": [
             "weather_report=weather_report.src:read_and_post",  
+            "weather_buffer_flush=weather_report.src:flush_buffer",  
         ],
     },
 )
