@@ -255,7 +255,7 @@ def flush_buffer():
 
     # Check for unsent data files
     buffer_file_names = (
-        Path(load_env_var("POST_BUFFER_PATH")) / "observation_buffer"
+        Path(load_env_var("OUTPUT_DATA_DIR")) / "observation_buffer"
     ).glob("*.json")
 
     # If list is empty then report and leave
