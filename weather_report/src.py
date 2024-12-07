@@ -207,6 +207,10 @@ def post_data(
         # Leave if requested
         if on_error == "exit":
             exit()
+
+        # Otherwise return response (or null if error was during request)
+        if isinstance(request_err, requests.HTTPError):
+            return response
         return None
 
     # If post request succeeds then all good!
