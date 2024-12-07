@@ -36,9 +36,11 @@ def start_logs(logfile_name: str) -> Logger:
     logger.remove()
 
     # Info goes to file
-    log_file_path = Path(load_env_var("LOG_FILE_PATH")) / f"{logfile_name}.log"
+    log_file_path = (
+        Path(load_env_var("OUTPUT_DATA_DIR")) / "logs" / f"{logfile_name}.log"
+    )
     logger.debug(f"{log_file_path}")
-    logger.add(log_file_path, level="INFO", retention='2 days')
+    logger.add(log_file_path, level="INFO", retention="2 days")
 
     # Also log at debug to console
     logger.add(sys.stdout, level="DEBUG")
@@ -186,7 +188,10 @@ def post_data(
         # Attempt to save in file buffer if requested
         if buffer:
             try:
-                save_data_to_buffer(sensor_data, Path(load_env_var("POST_BUFFER_PATH")))
+                save_data_to_buffer(
+                    sensor_data,
+                    Path(load_env_var("OUTPUT_DATA_DIR")) / "observation_buffer",
+                )
             except OSError as os_err:
                 logger.error(
                     f"Post request failed and data could not be saved due to the following exception: {os_err}"
@@ -249,7 +254,9 @@ def flush_buffer():
     start_logs("buffer_flushes")
 
     # Check for unsent data files
-    buffer_file_names = Path(load_env_var("POST_BUFFER_PATH")).glob("*.json")
+    buffer_file_names = (
+        Path(load_env_var("POST_BUFFER_PATH")) / "observation_buffer"
+    ).glob("*.json")
 
     # If list is empty then report and leave
     if len(buffer_file_names) == 0:
