@@ -12,7 +12,7 @@ from dataclasses import dataclass
 import bme280
 import requests
 import smbus2
-from typing import Union, Mapping, Any
+from typing import Union, Mapping, Any, Optional
 from dotenv import load_dotenv
 from loguru import logger
 from loguru._logger import Logger
@@ -162,7 +162,7 @@ def save_data_to_buffer(sensor_data: SensorData, buffer_dir_path: Path):
 
 def post_data(
     sensor_data: SensorData, post_config: PostConfig, buffer=True, on_error="exit"
-) -> requests.Response:
+) -> Optional[requests.Response]:
     """Sends data to server
 
     Args:
@@ -207,6 +207,7 @@ def post_data(
         # Leave if requested
         if on_error == "exit":
             exit()
+        return None
 
     # If post request succeeds then all good!
     else:
