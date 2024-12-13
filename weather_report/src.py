@@ -20,17 +20,39 @@ from loguru._logger import Logger
 load_dotenv()
 
 
-def load_env_var(var_name: str) -> str:
+def load_env_var(var_name: str) -> Any:
+    """Load environment variable
+
+    If the variable doesn't exist, log which one is missing and exit
+
+    Args:
+        var_name (str): Environment variable to get
+
+    Returns:
+        Any: Value of environment variable, typically a string, float, or int
+    """
     try:
         return os.environ[var_name]
     except KeyError:
         logger.error(
             "Could not load required environment variable {var_name}, check .env file"
         )
-        exit()
+        sys.exit()
 
 
 def start_logs(logfile_name: str) -> Logger:
+    """Start logs
+    
+    All INFO logs and above will be sent to the logfile, DEBUG sent to the console
+    
+    Logs are hard coded to rotate at 100kB, with old files kept for two days
+    
+    Args:
+        logfile_name(str): Path to save logs to
+    
+    Returns:
+        Logger: Logger object
+    """
 
     # Clear any existing logs
     logger.remove()
@@ -59,6 +81,7 @@ class SensorData:
     humidity: float
 
     def to_dict(self):
+        """Convert object to dictionary"""
         return {
             "observation_time": self.observation_time.isoformat(),
             "temperature": self.temperature,
@@ -67,7 +90,8 @@ class SensorData:
         }
 
     @classmethod
-    def from_json(cls, data_dict: Mapping[str, Any]):
+    def from_dict(cls, data_dict: Mapping[str, Any]):
+        """Create object from dictionary"""
         return cls(
             observation_time=datetime.fromisoformat(data_dict["observation_time"]),
             temperature=data_dict["temperature"],
@@ -88,6 +112,7 @@ class PostConfig:
     verify: bool
 
     def to_dict(self):
+        """Convert object to dictionary"""
         return {
             "url": self.post_url,
             "headers": {"Authorization": self.api_key},
@@ -97,6 +122,7 @@ class PostConfig:
 
     @classmethod
     def from_env(cls, verify=True):
+        """Create object from environment variables"""
 
         return cls(
             post_url=load_env_var("POST_URL"),
@@ -147,6 +173,12 @@ def read_sensor(port: Union[int, str], address: Union[int, str]) -> SensorData:
 
 
 def save_data_to_buffer(sensor_data: SensorData, buffer_dir_path: Path):
+    """Saves data to buffer
+
+    Args:
+        sensor_data (SensorData): Data to save
+        buffer_dir_path (Path): Directory to save in
+    """
 
     # Ensure that directory exists
     buffer_dir_path.mkdir(exist_ok=True)
@@ -183,7 +215,8 @@ def post_data(
         response.raise_for_status()
 
     # If post fails
-    # Request exception covers error return codes, but also covers other connection issues like SSL and Connection Errors
+    # Request exception covers error return codes, but also covers other connection issues
+    # e.g. SSL and Connection Errors
     except requests.RequestException as request_err:
         # Attempt to save in file buffer if requested
         if buffer:
@@ -194,11 +227,13 @@ def post_data(
                 )
             except OSError as os_err:
                 logger.error(
-                    f"Post request failed and data could not be saved due to the following exception: {os_err}"
+                    f"Post request failed and data could not be saved due to the following "
+                    f"exception: {os_err}"
                 )
             else:
                 logger.warning(
-                    f"Post request failed but data was saved to buffer successfuly. Request error was: {request_err}"
+                    f"Post request failed but data was saved to buffer successfuly. "
+                    f"Request error was: {request_err}"
                 )
         else:
             logger.error(
@@ -206,7 +241,7 @@ def post_data(
             )
         # Leave if requested
         if on_error == "exit":
-            exit()
+            sys.exit()
 
         # Otherwise return response (or null if error was during request)
         if isinstance(request_err, requests.HTTPError):
@@ -214,13 +249,23 @@ def post_data(
         return None
 
     # If post request succeeds then all good!
-    else:
-        logger.debug("Post request sent")
+    logger.debug("Post request sent")
 
     return response
 
 
-def remove_old_files(buffer_dir, max_size_mb: float = 15.0) -> int:
+def remove_old_files(buffer_dir: Path, max_size_mb: float = 15.0) -> int:
+    """Purge oldest files in a directory to keep it under a specified size
+
+    Args:
+        buffer_dir (Path): 
+            Directory to examine
+        max_size_mb (float, optional): 
+            Maximum size of files in directory in MB. Defaults to 15.0.
+
+    Returns:
+        int: Number of files deleted
+    """
 
     # Get files in buffer sorted by name
     buffer_files = sorted(buffer_dir.glob("*.log"), key=lambda f: f.name)
@@ -251,6 +296,11 @@ def remove_old_files(buffer_dir, max_size_mb: float = 15.0) -> int:
 
 
 def read_and_post():
+    """
+    Read sensor and send data to server
+
+    If data cannot be sent to the server, it is saved to the buffer to be sent later
+    """
 
     # Start logging
     start_logs("sensor_reads")
@@ -264,7 +314,7 @@ def read_and_post():
         sensor_data = read_sensor(port, address)
     except Exception as err:
         logger.error(f"Error reading sensor: {err}")
-        exit()
+        sys.exit()
     else:
         logger.debug("Sensor read successfully")
 
@@ -284,6 +334,17 @@ def read_and_post():
 
 
 def flush_buffer():
+    """
+    Send any files in buffer dir to server, deleting them if sent successfully
+
+    If files cannot be read, then they are moved to failed If files cannot be
+    sent, then the process will exit after five failures
+
+    If files remain in the buffer and/or failed directories at the end of the
+    function call, then if either contains more than 15 MB of files them the
+    oldest files are deleted (sorted by file name) to ensure that the buffer
+    does not swamp the server
+    """
 
     # Start logging
     start_logs("buffer_flushes")
@@ -300,7 +361,7 @@ def flush_buffer():
     # If list is empty then report and leave
     if len(buffer_file_names) == 0:
         logger.info("No files found in buffer")
-        exit()
+        sys.exit()
     logger.info(f"{len(buffer_file_names)} files found in buffer")
 
     # Read post config from env
@@ -316,13 +377,13 @@ def flush_buffer():
             logger.error(
                 f"Post request failed {n_attempts} times (max {attempt_limit}), exiting"
             )
-            exit()
+            sys.exit()
 
         # Load data from file
         try:
             with buffer_file.open() as f:
                 sensor_data = json.load(f)
-                sensor_data = SensorData.from_json(sensor_data)
+                sensor_data = SensorData.from_dict(sensor_data)
         except (OSError, KeyError) as err:
             logger.error(
                 f"Could not read data file {buffer_file} due to the following exception: {err}"
@@ -347,9 +408,10 @@ def flush_buffer():
             )
             n_attempts += 1
             continue
-        elif response.status_code != 201:
+        if response.status_code != 201:
             logger.warning(
-                f"Buffer flush received unexpected status code {response.status_code}: {response.reason}"
+                f"Buffer flush received unexpected status code "
+                f"{response.status_code}: {response.reason}"
             )
             n_attempts += 1
             continue
@@ -365,7 +427,7 @@ def flush_buffer():
     logger.info(f"Successfully sent {len(buffer_file_names)} files from the buffer")
 
     # Regargless of success or failure, clean up buffer and failed to max 15 MB each
-    for dir in [buffer_dir, fail_dir]:
-        n_removed = remove_old_files(dir)
+    for dir_path in [buffer_dir, fail_dir]:
+        n_removed = remove_old_files(dir_path)
         if n_removed > 0:
-            logger.warning(f"{dir} exceeded 15 MB limit, {n_removed} files removed")
+            logger.warning(f"{dir_path} exceeded 15 MB limit, {n_removed} files removed")
