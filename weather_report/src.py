@@ -220,6 +220,36 @@ def post_data(
     return response
 
 
+def remove_old_files(buffer_dir, max_size_mb: float = 15.0) -> int:
+
+    # Get files in buffer sorted by name
+    buffer_files = sorted(buffer_dir.glob("*.log"), key=lambda f: f.name)
+
+    # Get number of bytes which need to be purged
+    n_bytes_purge = (
+        sum(file.stat().st_size for file in buffer_files) - max_size_mb * 1024 * 1024
+    )
+
+    # If no purge required
+    if n_bytes_purge < 0:
+        return 0
+
+    # Get list of files to purge
+    n_bytes_to_delete = 0
+    files_to_delete = []
+    for file in buffer_files:
+        if n_bytes_to_delete > n_bytes_purge:
+            break
+        files_to_delete.append(file)
+        n_bytes_to_delete += file.stat().st_size
+
+    # Purge files
+    n_deleted = len(files_to_delete)
+    for file in files_to_delete:
+        file.unlink()
+    return n_deleted
+
+
 def read_and_post():
 
     # Start logging
@@ -258,8 +288,13 @@ def flush_buffer():
     # Start logging
     start_logs("buffer_flushes")
 
-    # Check for unsent data files
+    # Check for necessary directories
     buffer_dir = Path(load_env_var("OUTPUT_DATA_DIR")) / "observation_buffer"
+    buffer_dir.mkdir(exist_ok=True)
+    fail_dir = buffer_dir / "failed"
+    fail_dir.mkdir(exist_ok=True)
+
+    # Check for unsent data files
     buffer_file_names = [file for file in buffer_dir.iterdir() if file.is_file()]
 
     # If list is empty then report and leave
@@ -297,8 +332,6 @@ def flush_buffer():
             logger.error(
                 f"Could not read data file {buffer_file} due to the following exception: {err}"
             )
-            fail_dir = (buffer_file.parent / "failed")
-            fail_dir.mkdir(exist_ok=True)
             buffer_file.rename(fail_dir / buffer_file.name)
             continue
 
@@ -326,6 +359,13 @@ def flush_buffer():
             f"File {buffer_file.name} posted successfully, removing from buffer"
         )
         buffer_file.unlink()
-        logger.info(
+        logger.debug(
             f"File {buffer_file.name} posted successfully and removed from buffer"
         )
+    logger.info(f"Successfully sent {len(buffer_file_names)} files from the buffer")
+
+    # Regargless of success or failure, clean up buffer and failed to max 15 MB each
+    for dir in [buffer_dir, fail_dir]:
+        n_removed = remove_old_files(dir)
+        if n_removed > 0:
+            logger.warning(f"{dir} exceeded 15 MB limit, {n_removed} files removed")
