@@ -2,17 +2,17 @@
 Read sensor data from BME280 and send it over local network
 """
 
+import json
 import os
 import sys
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-import json
-from dataclasses import dataclass
+from typing import Any, Mapping, Optional, Union
 
 import bme280
 import requests
 import smbus2
-from typing import Union, Mapping, Any, Optional
 from dotenv import load_dotenv
 from loguru import logger
 from loguru._logger import Logger
