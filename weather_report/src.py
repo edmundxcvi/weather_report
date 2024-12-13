@@ -1,0 +1,433 @@
+"""
+Read sensor data from BME280 and send it over local network
+"""
+
+import json
+import os
+import sys
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Mapping, Optional, Union
+
+import bme280
+import requests
+import smbus2
+from dotenv import load_dotenv
+from loguru import logger
+from loguru._logger import Logger
+
+load_dotenv()
+
+
+def load_env_var(var_name: str) -> Any:
+    """Load environment variable
+
+    If the variable doesn't exist, log which one is missing and exit
+
+    Args:
+        var_name (str): Environment variable to get
+
+    Returns:
+        Any: Value of environment variable, typically a string, float, or int
+    """
+    try:
+        return os.environ[var_name]
+    except KeyError:
+        logger.error(
+            "Could not load required environment variable {var_name}, check .env file"
+        )
+        sys.exit()
+
+
+def start_logs(logfile_name: str) -> Logger:
+    """Start logs
+    
+    All INFO logs and above will be sent to the logfile, DEBUG sent to the console
+    
+    Logs are hard coded to rotate at 100kB, with old files kept for two days
+    
+    Args:
+        logfile_name(str): Path to save logs to
+    
+    Returns:
+        Logger: Logger object
+    """
+
+    # Clear any existing logs
+    logger.remove()
+
+    # Info goes to file
+    log_file_path = (
+        Path(load_env_var("OUTPUT_DATA_DIR")) / "logs" / f"{logfile_name}_{{time}}.log"
+    )
+    logger.debug(f"{log_file_path}")
+    logger.add(log_file_path, level="INFO", rotation="0.1 MB", retention="2 days")
+
+    # Also log at debug to console
+    logger.add(sys.stdout, level="DEBUG")
+    return logger
+
+
+@dataclass
+class SensorData:
+    """
+    Data class for sensor read
+    """
+
+    observation_time: datetime
+    temperature: float
+    pressure: float
+    humidity: float
+
+    def to_dict(self):
+        """Convert object to dictionary"""
+        return {
+            "observation_time": self.observation_time.isoformat(),
+            "temperature": self.temperature,
+            "pressure": self.pressure,
+            "humidity": self.humidity,
+        }
+
+    @classmethod
+    def from_dict(cls, data_dict: Mapping[str, Any]):
+        """Create object from dictionary"""
+        return cls(
+            observation_time=datetime.fromisoformat(data_dict["observation_time"]),
+            temperature=data_dict["temperature"],
+            pressure=data_dict["pressure"],
+            humidity=data_dict["humidity"],
+        )
+
+
+@dataclass
+class PostConfig:
+    """
+    Data class for requests kwargs
+    """
+
+    post_url: str
+    api_key: str
+    timeout: int
+    verify: bool
+
+    def to_dict(self):
+        """Convert object to dictionary"""
+        return {
+            "url": self.post_url,
+            "headers": {"Authorization": self.api_key},
+            "timeout": self.timeout,
+            "verify": self.verify,
+        }
+
+    @classmethod
+    def from_env(cls, verify=True):
+        """Create object from environment variables"""
+
+        return cls(
+            post_url=load_env_var("POST_URL"),
+            api_key=load_env_var("API_KEY"),
+            timeout=int(load_env_var("POST_TIMEOUT_SECONDS")),
+            verify=verify,
+        )
+
+
+def read_sensor(port: Union[int, str], address: Union[int, str]) -> SensorData:
+    """Gets data from sensor
+
+    Can pass the address in as a string representation of address as a base
+    sixteen integer, which will be converted to int in function
+
+    Args:
+        port (Union[int, str]) address (Union[int, str])
+
+    Returns:
+        SensorData
+    """
+
+    # Convert inputs to integers (if not already)
+    if not isinstance(port, int):
+        port = int(port)
+    if not isinstance(address, int):
+        address = int(address, 16)
+
+    # Get bus for port
+    bus = smbus2.SMBus(port)
+
+    # Load calibration parameters from sensor
+    sensor_calibration = bme280.load_calibration_params(bus, address)
+
+    # Get time ahead of read
+    read_time = datetime.now(timezone.utc)
+
+    # Read sensor
+    sensor_data = bme280.sample(bus, address, sensor_calibration)
+
+    # Convert to a sensible object
+    return SensorData(
+        observation_time=read_time,
+        temperature=sensor_data.temperature,
+        pressure=sensor_data.pressure,
+        humidity=sensor_data.humidity,
+    )
+
+
+def save_data_to_buffer(sensor_data: SensorData, buffer_dir_path: Path):
+    """Saves data to buffer
+
+    Args:
+        sensor_data (SensorData): Data to save
+        buffer_dir_path (Path): Directory to save in
+    """
+
+    # Ensure that directory exists
+    buffer_dir_path.mkdir(exist_ok=True)
+
+    # Create buffer file name
+    obs_time_str = sensor_data.observation_time.strftime("%Y%m%d%H%M%S")
+    buffer_file_path = buffer_dir_path / f"read_{obs_time_str}.json"
+
+    # Write buffer file
+    with buffer_file_path.open("w") as buffer_file:
+        json.dump(sensor_data.to_dict(), buffer_file)
+
+
+def post_data(
+    sensor_data: SensorData, post_config: PostConfig, buffer=True, on_error="exit"
+) -> Optional[requests.Response]:
+    """Sends data to server
+
+    Args:
+        sensor_data (SensorData)
+        post_config (PostConfig)
+        buffer (bool, optional): Defaults to True.
+
+    Returns:
+        requests.Response
+    """
+
+    # Try post
+    try:
+        response = requests.post(
+            **post_config.to_dict(),
+            json=sensor_data.to_dict(),
+        )
+        response.raise_for_status()
+
+    # If post fails
+    # Request exception covers error return codes, but also covers other connection issues
+    # e.g. SSL and Connection Errors
+    except requests.RequestException as request_err:
+        # Attempt to save in file buffer if requested
+        if buffer:
+            try:
+                save_data_to_buffer(
+                    sensor_data,
+                    Path(load_env_var("OUTPUT_DATA_DIR")) / "observation_buffer",
+                )
+            except OSError as os_err:
+                logger.error(
+                    f"Post request failed and data could not be saved due to the following "
+                    f"exception: {os_err}"
+                )
+            else:
+                logger.warning(
+                    f"Post request failed but data was saved to buffer successfuly. "
+                    f"Request error was: {request_err}"
+                )
+        else:
+            logger.error(
+                f"Post request failed due to the following exception: {request_err}"
+            )
+        # Leave if requested
+        if on_error == "exit":
+            sys.exit()
+
+        # Otherwise return response (or null if error was during request)
+        if isinstance(request_err, requests.HTTPError):
+            return response
+        return None
+
+    # If post request succeeds then all good!
+    logger.debug("Post request sent")
+
+    return response
+
+
+def remove_old_files(buffer_dir: Path, max_size_mb: float = 15.0) -> int:
+    """Purge oldest files in a directory to keep it under a specified size
+
+    Args:
+        buffer_dir (Path): 
+            Directory to examine
+        max_size_mb (float, optional): 
+            Maximum size of files in directory in MB. Defaults to 15.0.
+
+    Returns:
+        int: Number of files deleted
+    """
+
+    # Get files in buffer sorted by name
+    buffer_files = sorted(buffer_dir.glob("*.log"), key=lambda f: f.name)
+
+    # Get number of bytes which need to be purged
+    n_bytes_purge = (
+        sum(file.stat().st_size for file in buffer_files) - max_size_mb * 1024 * 1024
+    )
+
+    # If no purge required
+    if n_bytes_purge < 0:
+        return 0
+
+    # Get list of files to purge
+    n_bytes_to_delete = 0
+    files_to_delete = []
+    for file in buffer_files:
+        if n_bytes_to_delete > n_bytes_purge:
+            break
+        files_to_delete.append(file)
+        n_bytes_to_delete += file.stat().st_size
+
+    # Purge files
+    n_deleted = len(files_to_delete)
+    for file in files_to_delete:
+        file.unlink()
+    return n_deleted
+
+
+def read_and_post():
+    """
+    Read sensor and send data to server
+
+    If data cannot be sent to the server, it is saved to the buffer to be sent later
+    """
+
+    # Start logging
+    start_logs("sensor_reads")
+
+    # Load sensor location from env
+    port = int(load_env_var("I2C_PORT"))
+    address = int(load_env_var("I2C_ADDRESS"), 16)
+
+    # Read sensor
+    try:
+        sensor_data = read_sensor(port, address)
+    except Exception as err:
+        logger.error(f"Error reading sensor: {err}")
+        sys.exit()
+    else:
+        logger.debug("Sensor read successfully")
+
+    # Read post config from env
+    post_config = PostConfig.from_env(verify=load_env_var("SSL_CERT_PATH"))
+
+    # Send post request
+    response = post_data(sensor_data, post_config)
+
+    # Check for unexpected status
+    if response.status_code != 201:
+        logger.warning(
+            f"Sensor read received unexpected status code {response.status_code}: {response.reason}"
+        )
+    else:
+        logger.info("Data read and sent successfully")
+
+
+def flush_buffer():
+    """
+    Send any files in buffer dir to server, deleting them if sent successfully
+
+    If files cannot be read, then they are moved to failed If files cannot be
+    sent, then the process will exit after five failures
+
+    If files remain in the buffer and/or failed directories at the end of the
+    function call, then if either contains more than 15 MB of files them the
+    oldest files are deleted (sorted by file name) to ensure that the buffer
+    does not swamp the server
+    """
+
+    # Start logging
+    start_logs("buffer_flushes")
+
+    # Check for necessary directories
+    buffer_dir = Path(load_env_var("OUTPUT_DATA_DIR")) / "observation_buffer"
+    buffer_dir.mkdir(exist_ok=True)
+    fail_dir = buffer_dir / "failed"
+    fail_dir.mkdir(exist_ok=True)
+
+    # Check for unsent data files
+    buffer_file_names = [file for file in buffer_dir.iterdir() if file.is_file()]
+
+    # If list is empty then report and leave
+    if len(buffer_file_names) == 0:
+        logger.info("No files found in buffer")
+        sys.exit()
+    logger.info(f"{len(buffer_file_names)} files found in buffer")
+
+    # Read post config from env
+    post_config = PostConfig.from_env(verify=load_env_var("SSL_CERT_PATH"))
+
+    # Loop through files
+    n_attempts = 0
+    attempt_limit = int(load_env_var("BUFFER_POST_ATTEMPT_LIMIT"))
+    for buffer_file in buffer_file_names:
+
+        # Check that attempt limit has not been exceeded
+        if n_attempts > attempt_limit:
+            logger.error(
+                f"Post request failed {n_attempts} times (max {attempt_limit}), exiting"
+            )
+            sys.exit()
+
+        # Load data from file
+        try:
+            with buffer_file.open() as f:
+                sensor_data = json.load(f)
+                sensor_data = SensorData.from_dict(sensor_data)
+        except (OSError, KeyError) as err:
+            logger.error(
+                f"Could not read data file {buffer_file} due to the following exception: {err}"
+            )
+            continue
+        except json.JSONDecodeError as err:
+            logger.error(
+                f"Could not read data file {buffer_file} due to the following exception: {err}"
+            )
+            buffer_file.rename(fail_dir / buffer_file.name)
+            continue
+
+        # Send post request
+        response = post_data(
+            sensor_data, post_config, buffer=False, on_error="continue"
+        )
+
+        # If response is not as expected move on to next file (but don't delete)
+        if response is None:
+            logger.warning(
+                "Buffer flush failed during post request (did not receive response)"
+            )
+            n_attempts += 1
+            continue
+        if response.status_code != 201:
+            logger.warning(
+                f"Buffer flush received unexpected status code "
+                f"{response.status_code}: {response.reason}"
+            )
+            n_attempts += 1
+            continue
+
+        # Otherwise delete buffer file to prevent duplication
+        logger.debug(
+            f"File {buffer_file.name} posted successfully, removing from buffer"
+        )
+        buffer_file.unlink()
+        logger.debug(
+            f"File {buffer_file.name} posted successfully and removed from buffer"
+        )
+    logger.info(f"Successfully sent {len(buffer_file_names)} files from the buffer")
+
+    # Regargless of success or failure, clean up buffer and failed to max 15 MB each
+    for dir_path in [buffer_dir, fail_dir]:
+        n_removed = remove_old_files(dir_path)
+        if n_removed > 0:
+            logger.warning(f"{dir_path} exceeded 15 MB limit, {n_removed} files removed")
