@@ -297,7 +297,8 @@ def flush_buffer():
             logger.error(
                 f"Could not read data file {buffer_file} due to the following exception: {err}"
             )
-            buffer_file.rename(buffer_file.parent / "failed" / buffer_file.name)
+            fail_dir = (buffer_file.parent / "failed").mkdir(exist_ok=True)
+            buffer_file.rename(fail_dir / buffer_file.name)
             continue
 
         # Send post request
