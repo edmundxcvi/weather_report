@@ -259,9 +259,9 @@ def flush_buffer():
     start_logs("buffer_flushes")
 
     # Check for unsent data files
-    buffer_dir =  Path(load_env_var("OUTPUT_DATA_DIR")) / "observation_buffer"
+    buffer_dir = Path(load_env_var("OUTPUT_DATA_DIR")) / "observation_buffer"
     buffer_file_names = [file for file in buffer_dir.iterdir() if file.is_file()]
-    
+
     # If list is empty then report and leave
     if len(buffer_file_names) == 0:
         logger.info("No files found in buffer")
@@ -274,7 +274,7 @@ def flush_buffer():
     # Loop through files
     n_attempts = 0
     attempt_limit = int(load_env_var("BUFFER_POST_ATTEMPT_LIMIT"))
-    for file_name in buffer_file_names:
+    for buffer_file in buffer_file_names:
 
         # Check that attempt limit has not been exceeded
         if n_attempts > attempt_limit:
@@ -285,13 +285,20 @@ def flush_buffer():
 
         # Load data from file
         try:
-            with file_name.open() as buffer_file:
-                sensor_data = json.load(buffer_file)
+            with buffer_file.open() as f:
+                sensor_data = json.load(f)
                 sensor_data = SensorData.from_json(sensor_data)
         except (OSError, KeyError) as err:
             logger.error(
-                f"Could not read data file due to the following exception: {err}"
+                f"Could not read data file {buffer_file} due to the following exception: {err}"
             )
+            continue
+        except json.JSONDecodeError as err:
+            logger.error(
+                f"Could not read data file {buffer_file} due to the following exception: {err}"
+            )
+            buffer_file.rename(buffer_file.parent / "failed" / buffer_file.name)
+            continue
 
         # Send post request
         response = post_data(
@@ -300,7 +307,9 @@ def flush_buffer():
 
         # If response is not as expected move on to next file (but don't delete)
         if response is None:
-            logger.warning("Buffer flush failed during post request (did not receive response)")
+            logger.warning(
+                "Buffer flush failed during post request (did not receive response)"
+            )
             n_attempts += 1
             continue
         elif response.status_code != 201:
@@ -311,8 +320,10 @@ def flush_buffer():
             continue
 
         # Otherwise delete buffer file to prevent duplication
-        logger.debug(f"File {file_name.name} posted successfully, removing from buffer")
-        file_name.unlink()
+        logger.debug(
+            f"File {buffer_file.name} posted successfully, removing from buffer"
+        )
+        buffer_file.unlink()
         logger.info(
-            f"File {file_name.name} posted successfully and removed from buffer"
+            f"File {buffer_file.name} posted successfully and removed from buffer"
         )
