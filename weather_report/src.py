@@ -40,7 +40,7 @@ def start_logs(logfile_name: str) -> Logger:
         Path(load_env_var("OUTPUT_DATA_DIR")) / "logs" / f"{logfile_name}_{{time}}.log"
     )
     logger.debug(f"{log_file_path}")
-    logger.add(log_file_path, level="INFO", rotation="10 MB", retention="2 days")
+    logger.add(log_file_path, level="INFO", rotation="0.1 MB", retention="2 days")
 
     # Also log at debug to console
     logger.add(sys.stdout, level="DEBUG")
